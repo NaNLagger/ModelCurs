@@ -7,7 +7,7 @@ import java.util.*
 
 
 //Дикий костыль
-var getFrom = Fifo
+var getFrom = LightTasks
 
 abstract class Event(val time: Int) {
     abstract fun action()
@@ -50,7 +50,7 @@ class NewTaskEvent(time: Int, val queue: ArrayList<TaskInfo>, val resourceManage
         var res: Array<Event> = emptyArray()
         res += getFrom.getFromQueue(time, queue, resourceManager)
         if(countTasks > 0)
-            res += NewTaskEvent(time + ExpRandom.rand(180.0, 10.0).toInt() + 1, queue, resourceManager, countTasks - 1)
+            res += NewTaskEvent(time + ExpRandom.rand(60.0, 10.0).toInt() + 1, queue, resourceManager, countTasks - 1)
         return res
     }
 }
@@ -121,6 +121,40 @@ object AvailableTasks : GetFromQueue {
                 res += AddTaskEvent(time, task, resourceManager, queue)
             }
         }
+        return res
+    }
+}
+
+object LightTasks : GetFromQueue {
+    override fun getFromQueue(time: Int, queue: ArrayList<TaskInfo>, resourceManager: ResourceManager): Array<Event> {
+        var res: Array<Event> = emptyArray()
+        val queueWithoutExecuted = queue.filter { !it.executed }
+        val sortedQueue = queueWithoutExecuted.sortedWith(Comparator {
+            t, t1 ->
+            val first = t.memory + t.threads + t.devices.size
+            val second = t1.memory + t1.threads + t1.devices.size
+            first - second
+        })
+        res += sortedQueue
+                .takeWhile { resourceManager.checkRes(it) }
+                .map { AddTaskEvent(time, it, resourceManager, queue) }
+        return res
+    }
+}
+
+object LightTasksAvailable : GetFromQueue {
+    override fun getFromQueue(time: Int, queue: ArrayList<TaskInfo>, resourceManager: ResourceManager): Array<Event> {
+        var res: Array<Event> = emptyArray()
+        val queueWithoutExecuted = queue.filter { !it.executed }
+        val sortedQueue = queueWithoutExecuted.sortedWith(Comparator {
+            t, t1 ->
+            val first = t.memory + t.threads + t.devices.size
+            val second = t1.memory + t1.threads + t1.devices.size
+            first - second
+        })
+        res += sortedQueue
+                .filter { resourceManager.checkRes(it) }
+                .map { AddTaskEvent(time, it, resourceManager, queue) }
         return res
     }
 }
